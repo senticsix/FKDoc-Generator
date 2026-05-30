@@ -281,7 +281,7 @@ class FahrtkostenWindow(QWidget):
             return
 
         try:
-            self.generate_document_callback(
+            pdf_path = self.generate_document_callback(
                 hin,
                 back,
                 hin1,
@@ -290,10 +290,22 @@ class FahrtkostenWindow(QWidget):
                 self.config
             )
 
-            QMessageBox.information(self, "Erfolg", "Dokument wurde erfolgreich erstellt.")
+            if pdf_path:
+                QMessageBox.information(
+                    self,
+                    "Erfolg",
+                    f"Dokument wurde erfolgreich erstellt.\nDOCX und PDF gespeichert."
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    "Erfolg",
+                    "DOCX-Dokument wurde erstellt.\nPDF-Konvertierung fehlgeschlagen (LibreOffice nicht installiert?)."
+                )
         except Exception as error:
             QMessageBox.critical(
                 self,
                 "Fehler",
                 f"Dokument konnte nicht erstellt werden:\n{error}"
             )
+            print(error)
