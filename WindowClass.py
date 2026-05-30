@@ -14,6 +14,8 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
 )
+from PIL import Image
+import os
 
 from ConfigManager import load_config, save_config, config_exists, is_config_complete
 
@@ -25,7 +27,7 @@ class OptionsDialog(QDialog):
         self.config = dict(config)
 
         self.setWindowTitle("Optionen")
-        self.resize(520, 220)
+        self.resize(520, 280)
 
         self.name_input = QLineEdit()
         self.name_input.setText(self.config.get("name", ""))
@@ -47,11 +49,24 @@ class OptionsDialog(QDialog):
         output_path_layout.addWidget(self.output_path_input)
         output_path_layout.addWidget(self.output_path_button)
 
+        self.signature_input = QLineEdit()
+        self.signature_input.setReadOnly(True)
+        signature_status = "Vorhanden" if os.path.exists("signatur.png") else "Nicht vorhanden"
+        self.signature_input.setText(signature_status)
+
+        self.signature_button = QPushButton("Durchsuchen...")
+        self.signature_button.clicked.connect(self.browse_signature)
+
+        signature_layout = QHBoxLayout()
+        signature_layout.addWidget(self.signature_input)
+        signature_layout.addWidget(self.signature_button)
+
         form_layout = QFormLayout()
         form_layout.addRow("Name:", self.name_input)
         form_layout.addRow("Erstanreise:", self.initial_date_input)
         form_layout.addRow("Kilometer:", self.kilometers_input)
         form_layout.addRow("Speicherpfad:", output_path_layout)
+        form_layout.addRow("Signatur:", signature_layout)
 
         self.button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
@@ -79,6 +94,36 @@ class OptionsDialog(QDialog):
                 file_path += ".docx"
 
             self.output_path_input.setText(file_path)
+
+    def browse_signature(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Signatur auswählen",
+            "",
+            "Bilddateien (*.png *.jpg *.jpeg *.bmp *.gif)"
+        )
+
+        if file_path:
+            try:
+                # Open and convert image to PNG format
+                img = Image.open(file_path)
+                # Save as signatur.png in the current directory
+                img.save("signatur.png", "PNG")
+
+                # Update the status display
+                self.signature_input.setText("Vorhanden")
+
+                QMessageBox.information(
+                    self,
+                    "Erfolg",
+                    "Signatur wurde erfolgreich gespeichert."
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Fehler",
+                    f"Signatur konnte nicht gespeichert werden:\n{e}"
+                )
 
     def validate_and_accept(self):
         config = self.get_config()
@@ -145,15 +190,11 @@ class FahrtkostenWindow(QWidget):
         self.second_return_date.setDate(QDate.currentDate())
         self.second_return_date.setDisplayFormat("dd.MM.yyyy")
 
-        self.km_input = QLineEdit()
-        self.km_input.setText(self.config.get("kilometers", "155"))
-
         self.form_layout = QFormLayout()
         self.form_layout.addRow("Abreisedatum:", self.first_departure_date)
         self.form_layout.addRow("Rückreisedatum:", self.first_return_date)
         self.form_layout.addRow("Abreisedatum 2. Fahrt:", self.second_departure_date)
         self.form_layout.addRow("Rückreisedatum 2. Fahrt:", self.second_return_date)
-        self.form_layout.addRow("Kilometer:", self.km_input)
 
         self.create_button = QPushButton("Dokument erstellen")
         self.options_button = QPushButton("Optionen")
@@ -194,8 +235,6 @@ class FahrtkostenWindow(QWidget):
             self.config = dialog.get_config()
             save_config(self.config)
 
-            self.km_input.setText(self.config.get("kilometers", ""))
-
             QMessageBox.information(self, "Gespeichert", "Optionen wurden gespeichert.")
 
     def open_required_options(self):
@@ -205,8 +244,6 @@ class FahrtkostenWindow(QWidget):
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 self.config = dialog.get_config()
                 save_config(self.config)
-
-                self.km_input.setText(self.config.get("kilometers", ""))
 
                 QMessageBox.information(self, "Gespeichert", "Optionen wurden gespeichert.")
                 return
@@ -230,7 +267,7 @@ class FahrtkostenWindow(QWidget):
 
         hin = self.first_departure_date.date().toString("dd.MM.yyyy")
         back = self.first_return_date.date().toString("dd.MM.yyyy")
-        km = self.km_input.text().strip()
+        km = self.config.get("kilometers", "")
 
         hin1 = None
         back1 = None
@@ -240,13 +277,10 @@ class FahrtkostenWindow(QWidget):
             back1 = self.second_return_date.date().toString("dd.MM.yyyy")
 
         if not km:
-            QMessageBox.warning(self, "Fehler", "Bitte Kilometer eingeben.")
+            QMessageBox.warning(self, "Fehler", "Bitte Kilometer in den Optionen eingeben.")
             return
 
         try:
-            self.config["kilometers"] = km
-            save_config(self.config)
-
             self.generate_document_callback(
                 hin,
                 back,
