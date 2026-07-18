@@ -8,7 +8,7 @@ Eine kleine Desktop-App (Python + PyQt6), die das Formular **„Kostenerstattung
 - **1 oder 2 Fahrten** pro Antrag, Datumsauswahl über einen Kalender, in dem An- und Rückreise mit zwei Klicks in einem Rutsch gewählt werden (Zeitraum wird farbig markiert)
 - **Krankmeldung** per Häkchen zuschaltbar – im Formular werden die echten Ja/Nein-Kontrollkästchen umgeschaltet und der Krankmeldungszeitraum eingetragen
 - **Ausbildungsdauer** („vom … bis …") wird direkt in die Word-Datumssteuerelemente der Vorlage geschrieben
-- **Unterschrift** wird aus dem Namen generiert (z. B. „R. Remm") und in Schreibschrift (Brush Script MT) eingefügt – keine Bilddatei nötig
+- **Unterschrift** wird aus dem Namen generiert und in Schreibschrift (Brush Script MT) eingefügt – keine Bilddatei nötig
 - **PDF-Export** automatisch nach dem Erstellen (über Microsoft Word)
 - **Mail-Versand**: Nach dem Erstellen kann die PDF direkt verschickt werden – es öffnet sich ein fertiger Mail-Entwurf (Betreff „Fahrtkostenabrechnung") mit Anhang, der vor dem Senden noch geprüft werden kann. Beim ersten Versand fragt die App, welches Mail-Programm verwendet werden soll (macOS: Apple Mail, Outlook oder Thunderbird; Windows: Outlook oder Thunderbird) und merkt sich die Wahl
 - **PDF-Ablage**: Optional werden alle erzeugten PDFs zusätzlich in einem frei wählbaren Root-Ordner nach Datum sortiert abgelegt (`<Ordner>/<Jahr>/<Monat>/Fahrtkostenerstattung_<von>_bis_<bis>.pdf`)
