@@ -1,4 +1,5 @@
 import platform
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -278,6 +279,36 @@ def _convert_docx_to_pdf_mac(docx_path):
         return None
 
 
+def organize_pdf(pdf_path, date_from, date_to, config):
+    """Move the PDF into the configured root folder, ordered by date.
+
+    Structure: <root>/<YYYY>/<MM>/Fahrtkostenerstattung_<von>_bis_<bis>.pdf
+    Without a configured root folder the PDF stays next to the DOCX.
+    """
+    root = str(config.get("pdf-root", "")).strip()
+
+    if not root:
+        return pdf_path
+
+    try:
+        d_from = datetime.strptime(date_from, "%d.%m.%Y")
+        d_to = datetime.strptime(date_to, "%d.%m.%Y")
+
+        target_dir = Path(root) / f"{d_from:%Y}" / f"{d_from:%m}"
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        target = target_dir / (
+            f"Fahrtkostenerstattung_{d_from:%Y-%m-%d}_bis_{d_to:%Y-%m-%d}.pdf"
+        )
+
+        shutil.move(str(pdf_path), str(target))
+        print(f"PDF abgelegt unter: {target}")
+        return str(target)
+    except Exception as e:
+        print(f"PDF-Ablage im Root-Ordner fehlgeschlagen: {e}")
+        return pdf_path
+
+
 def generate_document(
     hin,
     back,
@@ -341,6 +372,10 @@ def generate_document(
     print(f"DOCX saved to: {output_path}")
 
     pdf_path = convert_docx_to_pdf(output_path)
+
+    if pdf_path:
+        pdf_path = organize_pdf(pdf_path, hin, back1 or back, config)
+
     return pdf_path
 
 

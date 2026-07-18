@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
@@ -18,6 +20,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QFrame,
     QCheckBox,
+    QComboBox,
+    QInputDialog,
 )
 
 from ConfigManager import (
@@ -26,6 +30,7 @@ from ConfigManager import (
     config_exists,
     is_config_complete,
 )
+from mailer import available_mail_programs, send_pdf_via_mail
 
 DATE_FORMAT = "dd.MM.yyyy"
 
@@ -174,6 +179,31 @@ class OptionsDialog(QDialog):
         self.kilometers_input = QLineEdit()
         self.kilometers_input.setText(self.config.get("kilometers", ""))
 
+        self.mail_to_input = QLineEdit()
+        self.mail_to_input.setPlaceholderText("Empfänger für den Mail-Versand")
+        self.mail_to_input.setText(self.config.get("mail-to", ""))
+
+        self.mail_program_combo = QComboBox()
+        self.mail_program_combo.addItem("– beim ersten Versand fragen –", "")
+        for program in available_mail_programs():
+            self.mail_program_combo.addItem(program, program)
+
+        saved_program = self.config.get("mail-program", "")
+        index = self.mail_program_combo.findData(saved_program)
+        self.mail_program_combo.setCurrentIndex(index if index >= 0 else 0)
+
+        self.pdf_root_input = QLineEdit()
+        self.pdf_root_input.setReadOnly(True)
+        self.pdf_root_input.setPlaceholderText("optional – Ablage nach Jahr/Monat")
+        self.pdf_root_input.setText(self.config.get("pdf-root", ""))
+
+        self.pdf_root_button = QPushButton("Durchsuchen...")
+        self.pdf_root_button.clicked.connect(self.browse_pdf_root)
+
+        pdf_root_layout = QHBoxLayout()
+        pdf_root_layout.addWidget(self.pdf_root_input)
+        pdf_root_layout.addWidget(self.pdf_root_button)
+
         self.output_path_input = QLineEdit()
         self.output_path_input.setReadOnly(True)
         self.output_path_input.setText(self.config.get("output_path", ""))
@@ -191,6 +221,9 @@ class OptionsDialog(QDialog):
         form_layout.addRow("Ausbildungsbeginn:", self.training_start_input)
         form_layout.addRow("Ausbildungsende:", self.training_end_input)
         form_layout.addRow("Kilometer:", self.kilometers_input)
+        form_layout.addRow("E-Mail-Empfänger:", self.mail_to_input)
+        form_layout.addRow("Mail-Programm:", self.mail_program_combo)
+        form_layout.addRow("PDF-Ordner:", pdf_root_layout)
         form_layout.addRow("Speicherpfad:", output_path_layout)
 
         self.button_box = QDialogButtonBox(
@@ -220,6 +253,16 @@ class OptionsDialog(QDialog):
 
             self.output_path_input.setText(file_path)
 
+    def browse_pdf_root(self):
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            "PDF-Ordner auswählen",
+            self.pdf_root_input.text() or str(Path.home()),
+        )
+
+        if folder:
+            self.pdf_root_input.setText(folder)
+
     def validate_and_accept(self):
         config = self.get_config()
 
@@ -247,6 +290,9 @@ class OptionsDialog(QDialog):
         self.config["date-ausb-anf"] = self.training_start_input.date().toString(DATE_FORMAT)
         self.config["date-ausb-ende"] = self.training_end_input.date().toString(DATE_FORMAT)
         self.config["kilometers"] = self.kilometers_input.text().strip()
+        self.config["mail-to"] = self.mail_to_input.text().strip()
+        self.config["mail-program"] = self.mail_program_combo.currentData() or ""
+        self.config["pdf-root"] = self.pdf_root_input.text().strip()
         self.config["output_path"] = self.output_path_input.text().strip()
 
         return self.config
@@ -361,6 +407,74 @@ class FahrtkostenWindow(QWidget):
 
         return None
 
+    def ask_mail_program(self):
+        """Ask once which mail program to use and remember the choice."""
+        programs = available_mail_programs()
+
+        if not programs:
+            return None
+
+        choice, ok = QInputDialog.getItem(
+            self,
+            "Mail-Programm wählen",
+            "Mit welchem Programm sollen die Mails verschickt werden?\n"
+            "(Die Auswahl wird gespeichert und lässt sich in den Optionen ändern.)",
+            programs,
+            0,
+            False,
+        )
+
+        if not ok or not choice:
+            return None
+
+        self.config["mail-program"] = choice
+        save_config(self.config)
+        return choice
+
+    def offer_mail_send(self, pdf_path, date_from, date_to):
+        message = "Dokument wurde erfolgreich erstellt.\nDOCX und PDF gespeichert."
+
+        answer = QMessageBox.question(
+            self,
+            "Erfolg",
+            message + "\n\nPDF jetzt per E-Mail verschicken?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        program = self.config.get("mail-program", "")
+        if not program:
+            program = self.ask_mail_program()
+            if not program:
+                return
+
+        name = self.config.get("name", "")
+        subject = "Fahrtkostenabrechnung"
+        body = (
+            "Guten Tag,\n\n"
+            f"anbei meine Fahrtkostenabrechnung.\n\n"
+            f"Mit freundlichen Grüßen\n{name}"
+        )
+
+        opened = send_pdf_via_mail(
+            pdf_path,
+            self.config.get("mail-to", ""),
+            subject,
+            body,
+            program,
+        )
+
+        if not opened:
+            QMessageBox.warning(
+                self,
+                "Mail-Versand",
+                f"Der Mail-Entwurf konnte nicht in {program} geöffnet werden.\n"
+                "Die PDF liegt am eingestellten Speicherort und kann manuell verschickt werden."
+            )
+
     def create_document(self):
         if not is_config_complete(self.config):
             QMessageBox.warning(
@@ -410,11 +524,7 @@ class FahrtkostenWindow(QWidget):
             )
 
             if pdf_path:
-                QMessageBox.information(
-                    self,
-                    "Erfolg",
-                    "Dokument wurde erfolgreich erstellt.\nDOCX und PDF gespeichert."
-                )
+                self.offer_mail_send(pdf_path, hin, back1 or back)
             else:
                 QMessageBox.information(
                     self,

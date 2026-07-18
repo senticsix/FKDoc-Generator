@@ -13,6 +13,8 @@ Eine kleine Desktop-App (Python + PyQt6), die das Formular **„Kostenerstattung
 - **Ausbildungsdauer** („vom … bis …") wird direkt in die Word-Datumssteuerelemente der Vorlage geschrieben
 - **Unterschrift** wird aus dem Namen generiert (z. B. „R. Remm") und in Schreibschrift (Brush Script MT) eingefügt – keine Bilddatei nötig
 - **PDF-Export** automatisch nach dem Erstellen (über Microsoft Word)
+- **Mail-Versand**: Nach dem Erstellen kann die PDF direkt verschickt werden – es öffnet sich ein fertiger Mail-Entwurf (Betreff „Fahrtkostenabrechnung") mit Anhang, der vor dem Senden noch geprüft werden kann. Beim ersten Versand fragt die App, welches Mail-Programm verwendet werden soll (macOS: Apple Mail, Outlook oder Thunderbird; Windows: Outlook oder Thunderbird) und merkt sich die Wahl
+- **PDF-Ablage**: Optional werden alle erzeugten PDFs zusätzlich in einem frei wählbaren Root-Ordner nach Datum sortiert abgelegt (`<Ordner>/<Jahr>/<Monat>/Fahrtkostenerstattung_<von>_bis_<bis>.pdf`)
 - **Plausibilitätsprüfungen**: Rückreise vor Abreise, überlappende Fahrten und Ausbildungsende vor -beginn werden abgefangen
 
 ## Voraussetzungen
@@ -37,10 +39,14 @@ python main.py
    - *Name* – voller Vor- und Nachname (daraus wird auch die Unterschrift generiert)
    - *Erstanreise*, *Ausbildungsbeginn*, *Ausbildungsende* – per Kalender wählbar
    - *Kilometer* – einfache Wegstrecke laut Routenplaner
+   - *E-Mail-Empfänger* – vorausgefüllt mit `anwesenheit-tn.brh@srh.de`, kann geändert werden
+   - *Mail-Programm* – wird normalerweise beim ersten Versand abgefragt, kann hier geändert werden
+   - *PDF-Ordner* – optional; Root-Ordner, in dem die PDFs nach Jahr/Monat sortiert abgelegt werden
    - *Speicherpfad* – wohin das fertige Dokument gespeichert wird
 2. **Fahrt eintragen:** „1 Fahrt" oder „2 Fahrten" wählen, dann je Fahrt auf **Auswählen…** klicken. Im Kalender zuerst die Abreise, dann die Rückreise anklicken – fertig.
 3. **Krankmeldung:** Falls vorhanden, Häkchen bei **„Krankmeldung liegt vor"** setzen und den Zeitraum genauso per Kalender wählen.
 4. **Dokument erstellen** klicken. Die App speichert die `.docx` am eingestellten Ort und erzeugt daneben die PDF-Datei.
+5. Auf Wunsch direkt im Anschluss: **„PDF jetzt per E-Mail verschicken?"** bestätigen – es öffnet sich ein Mail-Entwurf mit Betreff, Anschreiben und der PDF im Anhang. Prüfen und absenden.
 
 Die Optionen lassen sich jederzeit über den Button **Optionen** ändern.
 
@@ -90,8 +96,9 @@ Wichtig: Die Steuerelemente werden über den davorstehenden Text gefunden. Die B
 
 | Datei | Zweck |
 |---|---|
-| `main.py` | Einstiegspunkt, Dokument-Erzeugung, PDF-Umwandlung |
+| `main.py` | Einstiegspunkt, Dokument-Erzeugung, PDF-Umwandlung, PDF-Ablage |
 | `WindowClass.py` | Hauptfenster, Optionen-Dialog, Kalender-Bereichsauswahl |
+| `mailer.py` | Mail-Entwurf mit Anhang (Apple Mail, Outlook, Thunderbird) |
 | `ConfigManager.py` | Laden/Speichern der Einstellungen, Pfadlogik (auch für gebaute App) |
 | `Fahrtkostenerstattung_Familienheimfahrt.docx` | Word-Vorlage |
 | `build_mac.sh` / `build_win.bat` | Build-Skripte für die ausführbare App |

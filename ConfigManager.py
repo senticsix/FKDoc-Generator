@@ -50,6 +50,9 @@ DEFAULT_CONFIG = {
     "date-init": "",
     "date-ausb-anf": "",
     "date-ausb-ende": "",
+    "mail-to": "anwesenheit-tn.brh@srh.de",
+    "mail-program": "",
+    "pdf-root": "",
 }
 
 
