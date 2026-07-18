@@ -10,6 +10,7 @@ from docx.oxml.ns import qn
 from docx.shared import Pt
 from PyQt6.QtWidgets import QApplication
 
+import theme
 from ConfigManager import TEMPLATE_FILE
 from WindowClass import FahrtkostenWindow
 
@@ -381,6 +382,7 @@ def generate_document(
 
 def main():
     app = QApplication(sys.argv)
+    theme.install_auto_theme(app)
 
     window = FahrtkostenWindow(generate_document)
     window.show()

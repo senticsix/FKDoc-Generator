@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import (
+    QDate,
+    QEasingCurve,
+    QPoint,
+    QPropertyAnimation,
+    Qt,
+)
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QWidget,
@@ -22,6 +28,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QInputDialog,
+    QGraphicsOpacityEffect,
 )
 
 from ConfigManager import (
@@ -33,6 +40,36 @@ from ConfigManager import (
 from mailer import available_mail_programs, send_pdf_via_mail
 
 DATE_FORMAT = "dd.MM.yyyy"
+
+ANIM_FAST = 160
+ANIM_MEDIUM = 220
+
+
+def fade_in_widget(widget, duration=ANIM_FAST):
+    """Softly fade a widget in when it appears. Returns the animation."""
+    effect = QGraphicsOpacityEffect(widget)
+    widget.setGraphicsEffect(effect)
+
+    animation = QPropertyAnimation(effect, b"opacity", widget)
+    animation.setDuration(duration)
+    animation.setStartValue(0.0)
+    animation.setEndValue(1.0)
+    animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+    # Effekt nach der Animation entfernen (vermeidet Render-Nebenwirkungen)
+    animation.finished.connect(lambda: widget.setGraphicsEffect(None))
+    animation.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+    return animation
+
+
+def fade_in_window(window, duration=ANIM_MEDIUM):
+    """Fade in a top-level window/dialog. Returns the animation."""
+    animation = QPropertyAnimation(window, b"windowOpacity", window)
+    animation.setDuration(duration)
+    animation.setStartValue(0.0)
+    animation.setEndValue(1.0)
+    animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+    animation.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+    return animation
 
 
 def make_date_edit(initial_text=""):
@@ -87,8 +124,10 @@ class DateRangeEdit(QWidget):
         self.display.setReadOnly(True)
         self.display.setMinimumWidth(240)
         self.display.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.display.setObjectName("rangeDisplay")
 
         self.open_button = QPushButton("Auswählen...")
+        self.open_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.open_button.clicked.connect(self.open_popup)
 
         layout = QHBoxLayout()
@@ -99,12 +138,15 @@ class DateRangeEdit(QWidget):
 
         # Popup with the range calendar
         self.popup = QFrame(self, Qt.WindowType.Popup)
+        self.popup.setObjectName("calendarPopup")
         self.popup.setFrameShape(QFrame.Shape.StyledPanel)
+        self._popup_animation = None
 
         self.calendar = RangeCalendar()
         self.calendar.clicked.connect(self._on_date_clicked)
 
         self.hint_label = QLabel("Abreise anklicken, danach Rückreise.")
+        self.hint_label.setObjectName("hintLabel")
         self.hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         popup_layout = QVBoxLayout()
@@ -125,8 +167,27 @@ class DateRangeEdit(QWidget):
         self.hint_label.setText("Abreise anklicken, danach Rückreise.")
 
         position = self.display.mapToGlobal(self.display.rect().bottomLeft())
-        self.popup.move(position)
+        position += QPoint(0, 6)
+
+        # Dezent einblenden: kurzer Fade + leichtes Hochgleiten
+        self.popup.move(position + QPoint(0, 8))
+        self.popup.setWindowOpacity(0.0)
         self.popup.show()
+
+        slide = QPropertyAnimation(self.popup, b"pos", self.popup)
+        slide.setDuration(ANIM_FAST)
+        slide.setStartValue(position + QPoint(0, 8))
+        slide.setEndValue(position)
+        slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        fade = QPropertyAnimation(self.popup, b"windowOpacity", self.popup)
+        fade.setDuration(ANIM_FAST)
+        fade.setStartValue(0.0)
+        fade.setEndValue(1.0)
+
+        self._popup_animation = (slide, fade)
+        slide.start()
+        fade.start()
 
     def _on_date_clicked(self, date):
         calendar = self.calendar
@@ -167,7 +228,8 @@ class OptionsDialog(QDialog):
         self.config = dict(config)
 
         self.setWindowTitle("Optionen")
-        self.resize(520, 340)
+        self.resize(520, 380)
+        self._appear_animation = None
 
         self.name_input = QLineEdit()
         self.name_input.setText(self.config.get("name", ""))
@@ -231,6 +293,8 @@ class OptionsDialog(QDialog):
         )
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 16)
+        layout.setSpacing(12)
         layout.addLayout(form_layout)
         layout.addWidget(self.button_box)
 
@@ -238,6 +302,12 @@ class OptionsDialog(QDialog):
 
         self.button_box.accepted.connect(self.validate_and_accept)
         self.button_box.rejected.connect(self.reject)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+
+        if self._appear_animation is None:
+            self._appear_animation = fade_in_window(self)
 
     def browse_output_path(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -334,23 +404,31 @@ class FahrtkostenWindow(QWidget):
         self.form_layout.addRow("Zeitraum Krankmeldung:", self.sick_note_range)
 
         self.create_button = QPushButton("Dokument erstellen")
+        self.create_button.setObjectName("primaryButton")
+        self.create_button.setCursor(Qt.CursorShape.PointingHandCursor)
+
         self.options_button = QPushButton("Optionen")
+        self.options_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.options_button)
         button_layout.addWidget(self.create_button)
 
         footer_label = QLabel(f"© {QDate.currentDate().year()} Ricky Remm")
+        footer_label.setObjectName("footerLabel")
         footer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        footer_label.setStyleSheet("color: gray; font-size: 11px;")
 
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(20, 20, 20, 12)
+        main_layout.setSpacing(14)
         main_layout.addLayout(radio_layout)
         main_layout.addLayout(self.form_layout)
         main_layout.addLayout(button_layout)
         main_layout.addWidget(footer_label)
 
         self.setLayout(main_layout)
+
+        self._appear_animation = None
 
         self.one_trip_radio.toggled.connect(self.toggle_second_trip_fields)
         self.sick_note_checkbox.toggled.connect(self.toggle_sick_note_fields)
@@ -363,17 +441,31 @@ class FahrtkostenWindow(QWidget):
         if self.is_first_launch or not is_config_complete(self.config):
             self.open_required_options()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+
+        if self._appear_animation is None:
+            self._appear_animation = fade_in_window(self)
+
     def toggle_second_trip_fields(self):
         is_two_trips = self.two_trips_radio.isChecked()
+        was_hidden = not self.second_trip_range.isVisible()
 
         self.form_layout.labelForField(self.second_trip_range).setVisible(is_two_trips)
         self.second_trip_range.setVisible(is_two_trips)
 
+        if is_two_trips and was_hidden:
+            self._second_trip_animation = fade_in_widget(self.second_trip_range)
+
     def toggle_sick_note_fields(self):
         has_sick_note = self.sick_note_checkbox.isChecked()
+        was_hidden = not self.sick_note_range.isVisible()
 
         self.form_layout.labelForField(self.sick_note_range).setVisible(has_sick_note)
         self.sick_note_range.setVisible(has_sick_note)
+
+        if has_sick_note and was_hidden:
+            self._sick_note_animation = fade_in_widget(self.sick_note_range)
 
     def open_options(self):
         dialog = OptionsDialog(self.config, self)
@@ -455,7 +547,8 @@ class FahrtkostenWindow(QWidget):
         subject = "Fahrtkostenabrechnung"
         body = (
             "Guten Tag,\n\n"
-            f"anbei meine Fahrtkostenabrechnung.\n\n"
+            f"anbei die Fahrtkostenabrechnung für die Familienheimfahrt "
+            f"im Zeitraum {date_from} – {date_to}.\n\n"
             f"Mit freundlichen Grüßen\n{name}"
         )
 
