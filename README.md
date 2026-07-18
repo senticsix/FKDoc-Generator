@@ -1,9 +1,6 @@
-# FKscript – Fahrtkostenerstattung Familienheimfahrt
+# FKDoc-Generator – Fahrtkostenerstattung Familienheimfahrt
 
 Eine kleine Desktop-App (Python + PyQt6), die das Formular **„Kostenerstattung für Familienheimfahrten"** automatisch ausfüllt: Sie trägt Name, Fahrtdaten, Kilometer, Ausbildungsdauer, Krankmeldung und eine generierte Unterschrift in die Word-Vorlage ein, speichert das Ergebnis als `.docx` und wandelt es über Microsoft Word direkt in ein PDF um.
-
-© Ricky Remm
-
 ---
 
 ## Funktionen
@@ -39,7 +36,7 @@ python main.py
    - *Name* – voller Vor- und Nachname (daraus wird auch die Unterschrift generiert)
    - *Erstanreise*, *Ausbildungsbeginn*, *Ausbildungsende* – per Kalender wählbar
    - *Kilometer* – einfache Wegstrecke laut Routenplaner
-   - *E-Mail-Empfänger* – vorausgefüllt mit `anwesenheit-tn.brh@srh.de`, kann geändert werden
+   - *E-Mail-Empfänger* – vorausgefüllt mit `XXXXXXXXXXXXXX`, kann geändert werden
    - *Mail-Programm* – wird normalerweise beim ersten Versand abgefragt, kann hier geändert werden
    - *PDF-Ordner* – optional; Root-Ordner, in dem die PDFs nach Jahr/Monat sortiert abgelegt werden
    - *Speicherpfad* – wohin das fertige Dokument gespeichert wird
