@@ -13,6 +13,7 @@ Eine kleine Desktop-App (Python + PyQt6), die das Formular **„Kostenerstattung
 - **Mail-Versand**: Nach dem Erstellen kann die PDF direkt verschickt werden – es öffnet sich ein fertiger Mail-Entwurf (Betreff „Fahrtkostenabrechnung") mit Anhang, der vor dem Senden noch geprüft werden kann. Beim ersten Versand fragt die App, welches Mail-Programm verwendet werden soll (macOS: Apple Mail, Outlook oder Thunderbird; Windows: Outlook oder Thunderbird) und merkt sich die Wahl
 - **PDF-Ablage**: Optional werden alle erzeugten PDFs zusätzlich in einem frei wählbaren Root-Ordner nach Datum sortiert abgelegt (`<Ordner>/<Jahr>/<Monat>/Fahrtkostenerstattung_<von>_bis_<bis>.pdf`)
 - **Plausibilitätsprüfungen**: Rückreise vor Abreise, überlappende Fahrten und Ausbildungsende vor -beginn werden abgefangen
+- **Update-Check**: Die App prüft beim Start still im Hintergrund, ob auf GitHub ein neues stabiles Release verfügbar ist, und bietet den Download an; manuell über „Nach Updates suchen" in den Optionen
 
 ## Voraussetzungen
 
@@ -79,6 +80,27 @@ build_win.bat
 Ergebnis: `dist\FKscript.exe`. Beim ersten Start blockiert der SmartScreen-Filter
 eventuell die unsignierte Datei („Weitere Informationen" → „Trotzdem ausführen").
 
+## Updates & Versionierung
+
+Der Code liegt auf GitHub (`senticsix/FKscript`) mit zwei Branches:
+
+- **`main`** – stabiler Stand; von hier werden Releases veröffentlicht
+- **`experimental`** – Entwicklung und neue Features; wird nach dem Testen in `main` gemergt
+
+Die App vergleicht ihre Version (`version.py`) mit dem neuesten **stabilen** GitHub-Release
+(Pre-Releases aus `experimental` werden ignoriert). Wird eine neuere Version gefunden,
+zeigt die App die Release-Notes und öffnet auf Wunsch die Download-Seite im Browser –
+es wird nichts automatisch installiert.
+
+**Neues Release veröffentlichen:**
+
+1. Version in `version.py` erhöhen (z. B. `1.1.0`) und committen
+2. Tag setzen und pushen: `git tag v1.1.0 && git push origin main v1.1.0`
+3. Auf GitHub unter *Releases → Draft a new release* den Tag auswählen, Release-Notes
+   schreiben und die gebauten Apps (`dist/FKscript.app` als ZIP, `dist\FKscript.exe`)
+   als Assets anhängen. Für Vorabversionen aus `experimental` zusätzlich
+   *„Set as a pre-release"* ankreuzen – diese werden vom Update-Check übersprungen.
+
 ## Anpassung der Word-Vorlage
 
 Die App füllt die Vorlage über drei Mechanismen:
@@ -96,6 +118,7 @@ Wichtig: Die Steuerelemente werden über den davorstehenden Text gefunden. Die B
 | `main.py` | Einstiegspunkt, Dokument-Erzeugung, PDF-Umwandlung, PDF-Ablage |
 | `WindowClass.py` | Hauptfenster, Optionen-Dialog, Kalender-Bereichsauswahl |
 | `mailer.py` | Mail-Entwurf mit Anhang (Apple Mail, Outlook, Thunderbird) |
+| `updater.py` / `version.py` | Update-Check gegen GitHub-Releases, App-Version |
 | `ConfigManager.py` | Laden/Speichern der Einstellungen, Pfadlogik (auch für gebaute App) |
 | `Fahrtkostenerstattung_Familienheimfahrt.docx` | Word-Vorlage |
 | `build_mac.sh` / `build_win.bat` | Build-Skripte für die ausführbare App |

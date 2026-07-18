@@ -1,0 +1,34 @@
+# IDE / OS
+.idea/
+.DS_Store
+
+# Virtuelle Umgebung
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Persönliche Daten – nicht ins Repo!
+config.json
+signatur.png
+
+# Word-Lockdateien
+~$*
+
+# Erzeugte Dokumente
+*.pdf
+
+# PyInstaller
+build/
+dist/
+*.spec
+.venv-win/
+
+# Verteilpakete / Temporäres
+FKscript_Windows.zip
+_to_delete/
+.sync_*
+popup_check.png
+ui_*.png

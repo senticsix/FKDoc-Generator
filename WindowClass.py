@@ -6,8 +6,11 @@ from PyQt6.QtCore import (
     QPoint,
     QPropertyAnimation,
     Qt,
+    QThread,
+    QUrl,
+    pyqtSignal,
 )
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtWidgets import (
     QWidget,
     QRadioButton,
@@ -38,6 +41,8 @@ from ConfigManager import (
     is_config_complete,
 )
 from mailer import available_mail_programs, send_pdf_via_mail
+from updater import check_for_update
+from version import APP_VERSION
 
 DATE_FORMAT = "dd.MM.yyyy"
 
@@ -70,6 +75,43 @@ def fade_in_window(window, duration=ANIM_MEDIUM):
     animation.setEasingCurve(QEasingCurve.Type.OutCubic)
     animation.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
     return animation
+
+
+class UpdateCheckWorker(QThread):
+    """Fragt die GitHub-Releases im Hintergrund ab, ohne die UI zu blockieren."""
+
+    finished_check = pyqtSignal(object, object)  # (ergebnis, fehler)
+
+    def run(self):
+        try:
+            self.finished_check.emit(check_for_update(), None)
+        except Exception as error:
+            self.finished_check.emit(None, error)
+
+
+def show_update_dialog(parent, info):
+    """Zeigt gefundene Updates an und öffnet auf Wunsch die Download-Seite."""
+    notes = info.get("notes", "")
+    if len(notes) > 600:
+        notes = notes[:600] + "…"
+
+    text = (
+        f"Version {info['version']} ist verfügbar (installiert: {APP_VERSION})."
+    )
+    if notes:
+        text += f"\n\nÄnderungen:\n{notes}"
+    text += "\n\nDownload-Seite jetzt öffnen?"
+
+    answer = QMessageBox.question(
+        parent,
+        "Update verfügbar",
+        text,
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.Yes,
+    )
+
+    if answer == QMessageBox.StandardButton.Yes:
+        QDesktopServices.openUrl(QUrl(info["url"]))
 
 
 def make_date_edit(initial_text=""):
@@ -292,10 +334,23 @@ class OptionsDialog(QDialog):
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
 
+        self.update_button = QPushButton("Nach Updates suchen")
+        self.update_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_button.clicked.connect(self.check_updates_clicked)
+
+        version_label = QLabel(f"Version {APP_VERSION}")
+        version_label.setObjectName("footerLabel")
+
+        update_layout = QHBoxLayout()
+        update_layout.addWidget(version_label)
+        update_layout.addStretch()
+        update_layout.addWidget(self.update_button)
+
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 16)
         layout.setSpacing(12)
         layout.addLayout(form_layout)
+        layout.addLayout(update_layout)
         layout.addWidget(self.button_box)
 
         self.setLayout(layout)
@@ -332,6 +387,32 @@ class OptionsDialog(QDialog):
 
         if folder:
             self.pdf_root_input.setText(folder)
+
+    def check_updates_clicked(self):
+        self.update_button.setEnabled(False)
+        self.update_button.setText("Suche…")
+
+        try:
+            info = check_for_update()
+        except Exception as error:
+            QMessageBox.warning(
+                self,
+                "Update-Prüfung fehlgeschlagen",
+                f"GitHub konnte nicht erreicht werden:\n{error}",
+            )
+            return
+        finally:
+            self.update_button.setEnabled(True)
+            self.update_button.setText("Nach Updates suchen")
+
+        if info is None:
+            QMessageBox.information(
+                self,
+                "Kein Update",
+                f"Du verwendest bereits die aktuelle Version ({APP_VERSION}).",
+            )
+        else:
+            show_update_dialog(self, info)
 
     def validate_and_accept(self):
         config = self.get_config()
@@ -414,7 +495,7 @@ class FahrtkostenWindow(QWidget):
         button_layout.addWidget(self.options_button)
         button_layout.addWidget(self.create_button)
 
-        footer_label = QLabel(f"© {QDate.currentDate().year()} Ricky Remm")
+        footer_label = QLabel(f"© {QDate.currentDate().year()} Ricky Remm · v{APP_VERSION}")
         footer_label.setObjectName("footerLabel")
         footer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -438,8 +519,21 @@ class FahrtkostenWindow(QWidget):
         self.toggle_second_trip_fields()
         self.toggle_sick_note_fields()
 
+        self._start_update_check()
+
         if self.is_first_launch or not is_config_complete(self.config):
             self.open_required_options()
+
+    def _start_update_check(self):
+        """Beim Start still im Hintergrund nach Updates suchen."""
+        self._update_worker = UpdateCheckWorker(self)
+        self._update_worker.finished_check.connect(self._on_update_check_done)
+        self._update_worker.start()
+
+    def _on_update_check_done(self, info, error):
+        # Fehler beim stillen Check werden bewusst ignoriert (z. B. offline)
+        if error is None and info:
+            show_update_dialog(self, info)
 
     def showEvent(self, event):
         super().showEvent(event)
